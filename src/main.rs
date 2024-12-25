@@ -1,16 +1,18 @@
 mod megalib;
-use megalib::utils::*;
+use std::ops::Add;
+
 use gloo::console;
-use web_sys::{HtmlElement as Element, HtmlInputElement as Input};
+use megalib::utils::*;
 use yew::prelude::*;
 use yew::{html, Component, Html};
+use Msg::*;
 
 pub struct Model {
     todo: String,
     todo_list: Vec<String>,
 }
 
-pub enum Func {
+pub enum Msg {
     InputTodo(String),
     AddTodo,
     ComplateTodo(usize),
@@ -18,8 +20,33 @@ pub enum Func {
     None,
 }
 
+impl Msg {
+    fn func(self, model: &mut Model) -> bool {
+        match self {
+            InputTodo(todo) => {
+                model.todo = todo.clone();
+                true
+            }
+            AddTodo => {
+                model.todo_list.push(model.todo.clone());
+                model.todo = String::new();
+                true
+            }
+            ComplateTodo(index) => {
+                model.todo_list.remove(index);
+                true
+            }
+            Callback(callback) => {
+                callback();
+                false
+            }
+            None => false,
+        }
+    }
+}
+
 impl Component for Model {
-    type Message = Func;
+    type Message = Msg;
     type Properties = ();
 
     fn create(ctx: &yew::Context<Self>) -> Self {
@@ -30,26 +57,7 @@ impl Component for Model {
     }
 
     fn update(&mut self, ctx: &yew::Context<Self>, func: Self::Message) -> bool {
-        match func {
-            Func::InputTodo(todo) => {
-                self.todo = todo;
-                true
-            }
-            Func::AddTodo => {
-                self.todo_list.push(self.todo.clone());
-                self.todo = String::new();
-                true
-            }
-            Func::ComplateTodo(index) => {
-                self.todo_list.remove(index);
-                true
-            }
-            Func::Callback(callback) => {
-                callback();
-                false
-            }
-            Func::None => false,
-        }
+        func.func(self)
     }
 
     fn view(&self, ctx: &yew::Context<Self>) -> Html {
@@ -62,15 +70,16 @@ impl Component for Model {
                         placeholder="ToDoを入力"
                         oninput={call(ctx,|e:InputEvent|{
                             // イベントからHtmlInputElement(as Input済み)を取得し、InputTodoを実行している
-                            get::<Input>(&e,|element|Func::InputTodo(element.value()))
+                            get::<Input>(&e,|element|InputTodo(element.value()))
                         })}
                     />
                     <button
                         onclick={call(ctx,|e:MouseEvent|{
-                            get::<Element>(&e,|element|{Func::InputTodo(element.text_content().unwrap())})
+                            // element.inner_text()で要素内の出力文字列を取得
+                            get::<Element>(&e,|element|{InputTodo(element.inner_text())})
                         })}
                     >{"おせ！"}</button>
-                    <button onclick={call(ctx,|_|Func::AddTodo)}>{"追加"}</button>
+                    <button onclick={call(ctx,|_|Msg::AddTodo)}>{"追加"}</button>
                     <div>
                         <ul>
                             // iterの前にforをつけると展開できる
@@ -79,9 +88,8 @@ impl Component for Model {
                                     // moveによって、所有権を無名関数内の変数に譲渡する
                                     <li>{todo}<button id={i.to_string()} onclick={call(ctx,|e:MouseEvent|{
                                         get::<Element>(&e,|element|{
-                                            Func::ComplateTodo(id(element))
+                                            ComplateTodo(id(element))
                                         })
-                                        // Func::ComplateTodo(0)
                                     })}>{"完了"}</button></li>
                                 }
                             })}
@@ -92,24 +100,6 @@ impl Component for Model {
         }
     }
 }
-
-// fn call<E: JsCast + 'static>(ctx: &yew::Context<Model>, callback: fn(E) -> Func) -> Callback<E> {
-//     ctx.link().callback(move |e: E| callback(e))
-// }
-
-// fn id(element: Element) -> usize {
-//     element.id().parse::<usize>().expect("")
-// }
-
-// // インプットイベントから要素を抽出しコールバックを実行
-// fn get<Element: JsCast>(event: &Event, callback: fn(Element) -> Func) -> Func {
-//     if let Some(target) = event.target() {
-//         if let Some(element) = target.dyn_into::<Element>().ok() {
-//             return callback(element);
-//         }
-//     }
-//     Func::None
-// }
 
 fn main() {
     yew::start_app::<Model>();
